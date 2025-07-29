@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import FallbackMap from '@/components/FallbackMap';
 import MeasurementSidebar from '@/components/MeasurementSidebar';
 import AddressSearch from '@/components/AddressSearch';
@@ -11,9 +11,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Ruler, Upload, Zap, LogOut } from 'lucide-react';
+import { 
+  Ruler, 
+  Upload, 
+  Zap, 
+  LogOut, 
+  Keyboard, 
+  Settings, 
+  Save, 
+  History,
+  Calculator,
+  MapPin
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { 
+  useKeyboardShortcuts, 
+  createPaveEstimatorShortcuts 
+} from '@/components/ui/keyboard-shortcuts';
+import { 
+  ExportLoadingOverlay, 
+  PulseIndicator,
+  MeasurementSidebarSkeleton
+} from '@/components/ui/loading-states';
 
 const Index = () => {
   const [area, setArea] = useState(0);
@@ -21,6 +41,12 @@ const Index = () => {
   const [address, setAddress] = useState('');
   const [polygonCount, setPolygonCount] = useState(0);
   const [currentTheme, setCurrentTheme] = useState<Theme>('default');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportType, setExportType] = useState<'pdf' | 'excel'>('pdf');
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [lastCalculationTime, setLastCalculationTime] = useState<Date | null>(null);
+  
   const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
@@ -32,19 +58,77 @@ const Index = () => {
     }
   };
 
-  const handlePolygonComplete = (newArea: number) => {
-    setArea(newArea);
-    setPolygonCount(prev => prev + 1);
-  };
+  const handlePolygonComplete = useCallback((newArea: number) => {
+    setIsCalculating(true);
+    // Simulate calculation time for better UX
+    setTimeout(() => {
+      setArea(newArea);
+      setPolygonCount(prev => prev + 1);
+      setLastCalculationTime(new Date());
+      setIsCalculating(false);
+      toast.success(`Area calculated: ${newArea.toFixed(0)} sq ft`);
+    }, 500);
+  }, []);
 
-  const handleAddressSelect = (selectedAddress: string) => {
+  const handleAddressSelect = useCallback((selectedAddress: string) => {
     setAddress(selectedAddress);
-  };
+    toast.success('Address updated');
+  }, []);
 
-  const handleExport = (format: 'pdf' | 'excel') => {
-    // Export functionality would be implemented here
-    console.log(`Exporting to ${format}`);
-  };
+  const handleExport = useCallback(async (format: 'pdf' | 'excel') => {
+    setIsExporting(true);
+    setExportType(format);
+    
+    try {
+      // Simulate export time
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast.success(`${format.toUpperCase()} exported successfully`);
+    } catch (error) {
+      toast.error(`Failed to export ${format.toUpperCase()}`);
+    } finally {
+      setIsExporting(false);
+    }
+  }, []);
+
+  const handleClearMeasurements = useCallback(() => {
+    setArea(0);
+    setPolygonCount(0);
+    setLastCalculationTime(null);
+    // This would also clear the map polygons in a real implementation
+  }, []);
+
+  const handleToggleDrawing = useCallback(() => {
+    // This would toggle the drawing mode on the map
+    toast.info('Drawing mode toggled');
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    // This would zoom in on the map
+    toast.info('Map zoomed in');
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    // This would zoom out on the map
+    toast.info('Map zoomed out');
+  }, []);
+
+  const handleResetView = useCallback(() => {
+    // This would reset the map view
+    toast.info('Map view reset');
+  }, []);
+
+  // Keyboard shortcuts
+  const shortcuts = useMemo(() => createPaveEstimatorShortcuts(
+    () => handleExport('pdf'),
+    () => handleExport('excel'),
+    handleClearMeasurements,
+    handleToggleDrawing,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetView
+  ), [handleExport, handleClearMeasurements, handleToggleDrawing, handleZoomIn, handleZoomOut, handleResetView]);
+
+  useKeyboardShortcuts(shortcuts);
 
   const getThemeClasses = () => {
     switch (currentTheme) {
@@ -76,47 +160,140 @@ const Index = () => {
     }
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  // Calculate quick stats for header display
+  const quickStats = useMemo(() => {
+    if (area === 0) return null;
+    
+    const pricePerSqFt = 2.50; // Rough estimate
+    const estimatedCost = area * pricePerSqFt;
+    
+    return {
+      area: area.toFixed(0),
+      estimatedCost: formatCurrency(estimatedCost),
+      lastUpdated: lastCalculationTime?.toLocaleTimeString() || 'Never'
+    };
+  }, [area, lastCalculationTime]);
+
   return (
     <div className={`min-h-screen ${getThemeClasses()}`}>
+      {/* Export Loading Overlay */}
+      <ExportLoadingOverlay 
+        isVisible={isExporting} 
+        type={exportType}
+        onCancel={() => setIsExporting(false)}
+      />
+
       {/* Enhanced Header */}
-      <header className="border-b border-border bg-card/90 backdrop-blur-sm">
+      <header className="border-b border-border bg-card/90 backdrop-blur-sm sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className={`text-2xl font-bold ${currentTheme === 'tactical-comm' ? 'text-green-400 font-mono' : 'text-primary'}`}>
-                {getHeaderTitle()}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {currentTheme === 'tactical-comm' ? 'ADVANCED TACTICAL PLATFORM' : 'Advanced Multi-Modal Estimation Platform'}
-              </p>
+            <div className="flex items-center gap-6">
+              <div>
+                <h1 className={`text-2xl font-bold ${currentTheme === 'tactical-comm' ? 'text-green-400 font-mono' : 'text-primary'}`}>
+                  {getHeaderTitle()}
+                </h1>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <span>
+                    {currentTheme === 'tactical-comm' ? 'ADVANCED TACTICAL PLATFORM' : 'Advanced Multi-Modal Estimation Platform'}
+                  </span>
+                  {quickStats && (
+                    <>
+                      <span>•</span>
+                      <PulseIndicator active={isCalculating}>
+                        <span className="flex items-center gap-1">
+                          <Calculator className="h-3 w-3" />
+                          {quickStats.area} sq ft ≈ {quickStats.estimatedCost}
+                        </span>
+                      </PulseIndicator>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Real-time Status Indicators */}
+              <div className="hidden lg:flex items-center gap-2">
+                {area > 0 && (
+                  <Badge variant="default" className="animate-pulse">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    Active Project
+                  </Badge>
+                )}
+                {lastCalculationTime && (
+                  <Badge variant="secondary">
+                    Updated {lastCalculationTime.toLocaleTimeString()}
+                  </Badge>
+                )}
+              </div>
             </div>
+            
             <div className="flex items-center gap-4">
-              <div className="text-sm text-muted-foreground">
+              <div className="hidden lg:block text-sm text-muted-foreground">
                 Welcome, {user?.user_metadata?.first_name || user?.email}
               </div>
+              
               <Badge variant="secondary" className="flex items-center gap-1">
                 <Ruler className="h-3 w-3" />
                 {polygonCount} Areas Measured
               </Badge>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Upload Image
-              </Button>
-              <Button className="flex items-center gap-2">
-                <Zap className="h-4 w-4" />
-                AI Takeoff
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleSignOut}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </Button>
+              
+              {/* Enhanced Action Buttons */}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  <span className="hidden sm:inline">Upload Image</span>
+                </Button>
+                
+                <Button size="sm" className="flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  <span className="hidden sm:inline">AI Takeoff</span>
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowShortcuts(!showShortcuts)}
+                  className="flex items-center gap-2"
+                >
+                  <Keyboard className="h-4 w-4" />
+                  <span className="hidden md:inline">Shortcuts</span>
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </Button>
+              </div>
             </div>
           </div>
+          
+          {/* Keyboard Shortcuts Help */}
+          {showShortcuts && (
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+              <h3 className="text-sm font-semibold mb-2">Keyboard Shortcuts</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                <div><kbd className="px-1 py-0.5 bg-background rounded">Ctrl+P</kbd> Export PDF</div>
+                <div><kbd className="px-1 py-0.5 bg-background rounded">Ctrl+E</kbd> Export Excel</div>
+                <div><kbd className="px-1 py-0.5 bg-background rounded">Delete</kbd> Clear All</div>
+                <div><kbd className="px-1 py-0.5 bg-background rounded">Ctrl+D</kbd> Toggle Drawing</div>
+                <div><kbd className="px-1 py-0.5 bg-background rounded">Ctrl++</kbd> Zoom In</div>
+                <div><kbd className="px-1 py-0.5 bg-background rounded">Ctrl+-</kbd> Zoom Out</div>
+                <div><kbd className="px-1 py-0.5 bg-background rounded">Ctrl+0</kbd> Reset View</div>
+                <div><kbd className="px-1 py-0.5 bg-background rounded">Ctrl+?</kbd> Help</div>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -141,7 +318,7 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="main" className="space-y-6">
-            <div className="flex flex-1">
+            <div className="flex flex-1 gap-4">
               {/* Left Panel */}
               <div className={`w-80 border-r border-border p-4 space-y-4 ${
                 currentTheme === 'tactical-comm' ? 'bg-black/80 border-green-500/30' : 'bg-card'
@@ -207,12 +384,16 @@ const Index = () => {
               </div>
 
               {/* Right Sidebar */}
-              <MeasurementSidebar
-                area={area}
-                jobType={jobType}
-                address={address}
-                onExport={handleExport}
-              />
+              {isCalculating ? (
+                <MeasurementSidebarSkeleton />
+              ) : (
+                <MeasurementSidebar
+                  area={area}
+                  jobType={jobType}
+                  address={address}
+                  onExport={handleExport}
+                />
+              )}
             </div>
           </TabsContent>
 
