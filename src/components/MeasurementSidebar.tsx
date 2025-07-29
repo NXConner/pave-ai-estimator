@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Download, FileText, FileSpreadsheet, Calculator, DollarSign } from 'lucide-react';
+import { ExportService } from '@/lib/exportUtils';
+import { toast } from 'sonner';
 
 interface EstimateData {
   area: number;
@@ -42,6 +45,12 @@ const MeasurementSidebar: React.FC<MeasurementSidebarProps> = ({
   onExport
 }) => {
   const calculateEstimate = (): EstimateData => {
+    // Enhanced material calculations based on provided formulas and environment variables
+    const laborRate = parseFloat(import.meta.env.VITE_DEFAULT_LABOR_RATE) || 12.00;
+    const fuelPrice = parseFloat(import.meta.env.VITE_DEFAULT_FUEL_PRICE) || 3.50;
+    const sealMasterDistance = parseFloat(import.meta.env.VITE_SEALMATER_DISTANCE) || 45;
+    const markupPercentage = parseFloat(import.meta.env.VITE_DEFAULT_MARKUP_PERCENTAGE) || 25;
+    
     // Material calculations based on provided formulas
     const sealerGallons = area * 0.13;
     const sealerCost = sealerGallons * 3.65;
@@ -63,19 +72,18 @@ const MeasurementSidebar: React.FC<MeasurementSidebarProps> = ({
     const propaneTanks = Math.ceil(perimeter / 200);
     const propaneCost = propaneTanks * 10;
     
-    // Labor calculation (estimate 1 hour per 1000 sq ft)
+    // Enhanced labor calculation with configurable rate
     const laborHours = Math.ceil(area / 1000);
-    const laborCost = laborHours * 12;
+    const laborCost = laborHours * laborRate;
     
-    // Fuel calculation (round trip to SealMaster)
-    const distanceToSealMaster = 45; // miles (estimate)
-    const roundTripDistance = distanceToSealMaster * 2;
-    const fuelCost = (roundTripDistance / 8) * 3.50; // Using C30 truck, $3.50/gal estimate
+    // Enhanced fuel calculation with configurable parameters
+    const roundTripDistance = sealMasterDistance * 2;
+    const fuelCost = (roundTripDistance / 8) * fuelPrice; // Using C30 truck
     
     const subtotal = sealerCost + sandCost + fastDryCost + prepSealCost + 
                     crackFillerCost + propaneCost + laborCost + fuelCost;
     
-    const markup25 = subtotal * 1.25;
+    const markup25 = subtotal * (1 + markupPercentage / 100);
     const roundedUp = Math.ceil(markup25 / 10) * 10;
     const finalTotal = roundedUp * 1.25;
     
@@ -100,121 +108,220 @@ const MeasurementSidebar: React.FC<MeasurementSidebarProps> = ({
 
   const estimate = calculateEstimate();
 
+  const handleExportPDF = async () => {
+    try {
+      await ExportService.exportEstimatePDF(estimate, address, jobType);
+      onExport('pdf');
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      toast.error('Failed to export PDF');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      await ExportService.exportEstimateExcel(estimate, address, jobType);
+      onExport('excel');
+    } catch (error) {
+      console.error('Excel export failed:', error);
+      toast.error('Failed to export Excel');
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  const formatNumber = (num: number, decimals = 2) => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(num);
+  };
+
+  if (area === 0) {
+    return (
+      <div className="w-80 border-l border-border p-4 bg-card">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Measurement Required
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Draw a polygon on the map to start calculating your sealcoating estimate.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-80 bg-card border-l border-border h-full overflow-y-auto">
-      <div className="p-4 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-primary">Project Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div>
-              <p className="text-sm text-muted-foreground">Job Type</p>
-              <Badge variant="secondary">{jobType.replace('-', ' ').toUpperCase()}</Badge>
+    <div className="w-80 border-l border-border p-4 bg-card space-y-4">
+      {/* Area Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5" />
+            Area Measurement
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-primary">
+              {formatNumber(area, 0)}
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Address</p>
-              <p className="text-sm">{address || 'No address selected'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Area</p>
-              <p className="text-lg font-semibold text-primary">
-                {area.toLocaleString()} sq ft
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            <div className="text-sm text-muted-foreground">Square Feet</div>
+            <Badge variant="secondary" className="mt-2">
+              {jobType === 'driveway' ? 'Driveway' : 'Parking Lot'}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-primary">Materials</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm">Sealer ({estimate.materials.sealer.gallons.toFixed(1)} gal)</span>
-              <span className="text-sm font-medium">${estimate.materials.sealer.cost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">Sand ({estimate.materials.sand.bags} bags)</span>
-              <span className="text-sm font-medium">${estimate.materials.sand.cost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">Fast Dry ({estimate.materials.fastDry.buckets} buckets)</span>
-              <span className="text-sm font-medium">${estimate.materials.fastDry.cost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">Prep Seal ({estimate.materials.prepSeal.buckets} bucket)</span>
-              <span className="text-sm font-medium">${estimate.materials.prepSeal.cost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">Crack Filler ({estimate.materials.crackFiller.boxes} boxes)</span>
-              <span className="text-sm font-medium">${estimate.materials.crackFiller.cost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">Propane ({estimate.materials.propane.tanks} tanks)</span>
-              <span className="text-sm font-medium">${estimate.materials.propane.cost.toFixed(2)}</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Materials Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Materials</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span>Sealer ({formatNumber(estimate.materials.sealer.gallons, 1)} gal)</span>
+            <span className="font-medium">{formatCurrency(estimate.materials.sealer.cost)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Sand ({estimate.materials.sand.bags} bags)</span>
+            <span className="font-medium">{formatCurrency(estimate.materials.sand.cost)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Fast Dry ({estimate.materials.fastDry.buckets} buckets)</span>
+            <span className="font-medium">{formatCurrency(estimate.materials.fastDry.cost)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Prep Seal ({estimate.materials.prepSeal.buckets} bucket)</span>
+            <span className="font-medium">{formatCurrency(estimate.materials.prepSeal.cost)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Crack Filler ({estimate.materials.crackFiller.boxes} boxes)</span>
+            <span className="font-medium">{formatCurrency(estimate.materials.crackFiller.cost)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Propane ({estimate.materials.propane.tanks} tanks)</span>
+            <span className="font-medium">{formatCurrency(estimate.materials.propane.cost)}</span>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-primary">Labor & Fuel</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm">Labor ({estimate.labor.hours} hrs @ $12/hr)</span>
-              <span className="text-sm font-medium">${estimate.labor.cost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">Fuel ({estimate.fuel.distance} mi round trip)</span>
-              <span className="text-sm font-medium">${estimate.fuel.cost.toFixed(2)}</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Labor & Expenses */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Labor & Expenses</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span>Labor ({estimate.labor.hours} hrs)</span>
+            <span className="font-medium">{formatCurrency(estimate.labor.cost)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Fuel ({estimate.fuel.distance} miles)</span>
+            <span className="font-medium">{formatCurrency(estimate.fuel.cost)}</span>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-primary">Pricing</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm">Subtotal</span>
-              <span className="text-sm font-medium">${estimate.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">With 25% Markup</span>
-              <span className="text-sm font-medium">${estimate.markup25.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">Rounded Up</span>
-              <span className="text-sm font-medium">${estimate.roundedUp.toFixed(2)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between">
-              <span className="text-base font-semibold">Final Total (25% markup)</span>
-              <span className="text-lg font-bold text-primary">${estimate.finalTotal.toFixed(2)}</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Cost Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Cost Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span>Subtotal</span>
+            <span>{formatCurrency(estimate.subtotal)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>25% Markup</span>
+            <span>{formatCurrency(estimate.markup25 - estimate.subtotal)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>After Markup</span>
+            <span>{formatCurrency(estimate.markup25)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Rounded Up</span>
+            <span>{formatCurrency(estimate.roundedUp)}</span>
+          </div>
+          <Separator />
+          <div className="flex justify-between font-bold text-lg">
+            <span>Final Total</span>
+            <span className="text-green-600">{formatCurrency(estimate.finalTotal)}</span>
+          </div>
+          <div className="text-xs text-muted-foreground text-center">
+            Price per sq ft: {formatCurrency(estimate.finalTotal / area)}
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="space-y-2">
+      {/* Enhanced Export Options */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Export Estimate
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
           <Button 
-            onClick={() => onExport('pdf')} 
-            className="w-full"
+            onClick={handleExportPDF}
+            className="w-full flex items-center gap-2"
             variant="default"
           >
-            Export to PDF
+            <FileText className="h-4 w-4" />
+            Export as PDF
           </Button>
           <Button 
-            onClick={() => onExport('excel')} 
-            className="w-full"
-            variant="secondary"
+            onClick={handleExportExcel}
+            className="w-full flex items-center gap-2"
+            variant="outline"
           >
-            Export to Excel
+            <FileSpreadsheet className="h-4 w-4" />
+            Export as Excel
           </Button>
-        </div>
-      </div>
+          <div className="text-xs text-muted-foreground text-center">
+            Professional estimates with detailed breakdown
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Job Details */}
+      {address && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Job Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm space-y-1">
+              <div>
+                <span className="font-medium">Address:</span>
+                <div className="text-muted-foreground">{address}</div>
+              </div>
+              <div className="mt-2">
+                <span className="font-medium">Date:</span>
+                <div className="text-muted-foreground">{new Date().toLocaleDateString()}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
