@@ -19,7 +19,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onPolygonComplete, onAddressSelec
 
     try {
       const loader = new Loader({
-        apiKey: 'GOOGLE_MAPS_API_KEY', // User will need to add this
+        apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'DEMO_MODE', // Add your API key to environment variables
         version: 'weekly',
         libraries: ['drawing', 'geometry', 'places']
       });
