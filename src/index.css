@@ -43,6 +43,35 @@ All colors MUST be HSL.
     --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.3);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
+    /* Gemini Magic Theme Colors */
+    --gemini-primary: 280 100% 80%;
+    --gemini-secondary: 320 100% 70%;
+    --gemini-accent: 260 100% 85%;
+    --gemini-gradient: linear-gradient(135deg, hsl(var(--gemini-primary)), hsl(var(--gemini-secondary)));
+    
+    /* Echo Comm Tactical Theme Colors */
+    --tactical-green: 120 100% 40%;
+    --tactical-amber: 45 100% 60%;
+    --tactical-red: 0 100% 50%;
+    --tactical-blue: 200 100% 60%;
+    --tactical-gradient: linear-gradient(45deg, hsl(var(--tactical-green) / 0.8), hsl(var(--tactical-blue) / 0.8));
+    
+    /* Matrix/Cyberpunk Theme Colors */
+    --matrix-green: 120 100% 50%;
+    --matrix-cyan: 180 100% 50%;
+    --matrix-purple: 270 100% 70%;
+    --matrix-gradient: linear-gradient(180deg, hsl(var(--matrix-green) / 0.9), hsl(var(--matrix-cyan) / 0.9));
+    
+    /* Combined Theme Variables */
+    --theme-nexus-primary: 200 100% 50%;
+    --theme-nexus-secondary: 280 100% 60%;
+    --theme-nexus-accent: 120 100% 45%;
+    --theme-nexus-gradient: linear-gradient(135deg, 
+      hsl(var(--theme-nexus-primary) / 0.8), 
+      hsl(var(--theme-nexus-secondary) / 0.7),
+      hsl(var(--theme-nexus-accent) / 0.6)
+    );
+
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
