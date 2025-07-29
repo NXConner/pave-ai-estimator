@@ -11,7 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Ruler, Upload, Zap } from 'lucide-react';
+import { Ruler, Upload, Zap, LogOut } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 const Index = () => {
   const [area, setArea] = useState(0);
@@ -19,6 +21,16 @@ const Index = () => {
   const [address, setAddress] = useState('');
   const [polygonCount, setPolygonCount] = useState(0);
   const [currentTheme, setCurrentTheme] = useState<Theme>('default');
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success("Signed out successfully");
+    } catch (error) {
+      toast.error("Error signing out");
+    }
+  };
 
   const handlePolygonComplete = (newArea: number) => {
     setArea(newArea);
@@ -79,6 +91,9 @@ const Index = () => {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                Welcome, {user?.user_metadata?.first_name || user?.email}
+              </div>
               <Badge variant="secondary" className="flex items-center gap-1">
                 <Ruler className="h-3 w-3" />
                 {polygonCount} Areas Measured
@@ -90,6 +105,15 @@ const Index = () => {
               <Button className="flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 AI Takeoff
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleSignOut}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
               </Button>
             </div>
           </div>
